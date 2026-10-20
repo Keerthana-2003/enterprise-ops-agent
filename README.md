@@ -120,14 +120,6 @@ scores, failure categories, tool error rate, runs using parallel tool calls, ave
 latency, average tokens, and prompt cache hit rate. Results are saved to
 `evals/results/<model>.json` with the dataset version hash.
 
-**Results:** _(fill in after you run it)_
-
-| Model | Task success | Judge mean (1-5) | Tool error rate | p95 latency | Avg tokens | Cache hit rate |
-|---|---|---|---|---|---|---|
-| gpt-4o-mini (loop) | | | | | | |
-| gpt-4o-mini (LangGraph) | | | | | | |
-| llama3.1 (8B, local) | | | | | | |
-| Claude 3.5 Haiku (Bedrock) | | | | | | |
 
 ## Deploy to AWS (Terraform)
 
