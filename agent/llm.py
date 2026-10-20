@@ -54,6 +54,10 @@ class AsyncOpenAIChatClient:
     ):
         from openai import AsyncOpenAI  # imported lazily so tests run without the SDK
 
+        base = base_url or os.getenv("OPENAI_BASE_URL")
+        if not base and not (api_key or os.getenv("OPENAI_API_KEY")):
+            raise LLMError("OPENAI_API_KEY is not set. Export it in this terminal, or set OPENAI_BASE_URL "
+                           "for a local model.")
         self.model = model or os.getenv("AGENT_MODEL", "gpt-4o-mini")
         self.client = AsyncOpenAI(
             base_url=base_url or os.getenv("OPENAI_BASE_URL") or None,
@@ -89,9 +93,27 @@ class AsyncOpenAIChatClient:
                 )
             except Exception as err:  # network errors, rate limits, 5xx
                 last_err = err
+                if not _retryable(err):
+                    raise LLMError(f"LLM call failed (not retryable): {_describe(err)}") from None
                 if attempt < self.max_retries:
                     await asyncio.sleep(min(8.0, (2**attempt) + random.random()))
-        raise LLMError(f"LLM call failed after {self.max_retries + 1} attempts: {last_err}")
+        raise LLMError(f"LLM call failed after {self.max_retries + 1} attempts: {_describe(last_err)}")
+
+
+def _describe(err: Exception | None) -> str:
+    status = getattr(err, "status_code", None)
+    code = getattr(err, "code", None)
+    return " ".join(str(x) for x in (type(err).__name__, status, code, err) if x)
+
+
+def _retryable(err: Exception) -> bool:
+    """Retry timeouts, connection errors, 408/409/429 and 5xx; fail fast on auth, quota and bad requests."""
+    if getattr(err, "code", None) == "insufficient_quota":  # 429, but more retries will not help
+        return False
+    status = getattr(err, "status_code", None)
+    if status is None:
+        return True  # connection errors and timeouts carry no status
+    return status in (408, 409, 429) or status >= 500
 
 
 class ScriptedLLM:

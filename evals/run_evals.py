@@ -93,8 +93,12 @@ async def evaluate(args: argparse.Namespace) -> dict:
                "prompt_tokens": run["prompt_tokens"], "judge": score.model_dump() if score else None,
                "judge_mean": score.mean if score else None, "answer": run["answer"],
                "actions": [a["action_type"] for a in run["proposed_actions"]]}
+        llm_errors = [s["error"] for s in run["steps"] if s["kind"] == "error"]
+        row["llm_error"] = llm_errors[0] if llm_errors else None
         print(f"{'PASS' if passed else 'FAIL':4}  {task['id']:28} calls={tool_calls:2}  errors={run['tool_errors']}  "
               f"{run['latency_ms']/1000:5.1f}s  judge={row['judge_mean'] or '-'}  {failure or ''}")
+        if row["llm_error"]:
+            print(f"      -> {row['llm_error']}")
         return row
 
     rows = await asyncio.gather(*(one(t) for t in tasks))

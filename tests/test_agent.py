@@ -281,3 +281,14 @@ def test_judge_parsing_and_prompt(data_dir):
     run = Agent(ScriptedLLM(happy_script()), data_dir).run("Fabrikam?").to_dict()
     payload = json.loads(build_judge_prompt("Fabrikam?", run)[1]["content"])
     assert "T-504" in payload["EVIDENCE"] and payload["PROPOSED_ACTIONS"][0]["action"] == "escalate_to_account_manager"
+
+
+def test_retry_policy_fails_fast_on_auth_and_quota_errors():
+    from agent.llm import _retryable
+
+    class E(Exception):
+        def __init__(self, status=None, code=None):
+            self.status_code, self.code = status, code
+
+    assert not _retryable(E(401)) and not _retryable(E(400)) and not _retryable(E(429, "insufficient_quota"))
+    assert _retryable(E(429, "rate_limit_exceeded")) and _retryable(E(503)) and _retryable(E())
