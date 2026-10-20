@@ -106,10 +106,13 @@ def _describe(err: Exception | None) -> str:
     return " ".join(str(x) for x in (type(err).__name__, status, code, err) if x)
 
 
+_NO_RETRY_CODES = {"insufficient_quota", "credit_balance_exhausted", "billing_hard_limit_reached"}
+
+
 def _retryable(err: Exception) -> bool:
     """Retry timeouts, connection errors, 408/409/429 and 5xx; fail fast on auth, quota and bad requests."""
-    if getattr(err, "code", None) == "insufficient_quota":  # 429, but more retries will not help
-        return False
+    if getattr(err, "code", None) in _NO_RETRY_CODES or getattr(err, "type", None) == "insufficient_quota":
+        return False  # 429s caused by billing: more retries will not help
     status = getattr(err, "status_code", None)
     if status is None:
         return True  # connection errors and timeouts carry no status

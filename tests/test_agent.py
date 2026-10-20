@@ -287,8 +287,9 @@ def test_retry_policy_fails_fast_on_auth_and_quota_errors():
     from agent.llm import _retryable
 
     class E(Exception):
-        def __init__(self, status=None, code=None):
-            self.status_code, self.code = status, code
+        def __init__(self, status=None, code=None, type=None):
+            self.status_code, self.code, self.type = status, code, type
 
     assert not _retryable(E(401)) and not _retryable(E(400)) and not _retryable(E(429, "insufficient_quota"))
+    assert not _retryable(E(429, "credit_balance_exhausted", "insufficient_quota"))
     assert _retryable(E(429, "rate_limit_exceeded")) and _retryable(E(503)) and _retryable(E())
