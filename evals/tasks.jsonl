@@ -1,0 +1,8 @@
+{"id": "fabrikam_conflict", "task": "Fabrikam has open support tickets and unpaid invoices. What should we do?", "expect_all": [["T-504"], ["Priya Shah"], ["escalat"]], "expect_action": "escalate_to_account_manager"}
+{"id": "northwind_p1", "task": "Northwind's finance team can't export dashboards. Does this need escalation, and who owns the account?", "expect_all": [["Priya Shah"], ["4 hours", "four hours"]], "expect_action": "escalate_to_account_manager"}
+{"id": "northwind_credit", "task": "Can we give Northwind Traders a service credit?", "expect_all": [["INV-1002"], ["overdue"]], "expect_action": null}
+{"id": "contoso_credit_cap", "task": "What is the maximum service credit Contoso Health could receive?", "expect_all": [["12,500", "12500"]], "expect_action": null}
+{"id": "tailspin_owner_invoice", "task": "Who manages Tailspin Airlines, and how much do they owe on open invoices?", "expect_all": [["Marcus Lee"], ["98,000", "98000"]], "expect_action": null}
+{"id": "wideworld_standing", "task": "Is Wide World Importers in good standing? Any open issues?", "expect_all": [["good standing", "no open", "no overdue", "all invoices", "paid"]], "expect_action": null}
+{"id": "adventure_works_sla_credit", "task": "Adventure Works had a P1 outage that lasted 30 hours. Are they eligible for a credit, and how much at most?", "expect_all": [["eligible"], ["600"]], "expect_action": null}
+{"id": "unknown_customer", "task": "What is the invoice status for Globex Corporation?", "expect_all": [["not found", "no customer", "couldn't find", "could not find", "no record", "no matching", "unable to find", "does not exist", "no entity"]], "expect_action": null}

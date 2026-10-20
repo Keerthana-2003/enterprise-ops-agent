@@ -1,0 +1,27 @@
+# Local stack: agent API + Datadog Agent receiving OpenTelemetry traces over OTLP/HTTP.
+# Usage:  DD_API_KEY=... OPENAI_API_KEY=... docker compose -f deploy/docker-compose.datadog.yml up --build
+# Traces appear in Datadog APM under service "enterprise-ops-agent".
+services:
+  api:
+    build: ..
+    ports:
+      - "8000:8000"
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      AGENT_MODEL: ${AGENT_MODEL:-gpt-4o-mini}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://datadog-agent:4318
+      OTEL_SERVICE_NAME: enterprise-ops-agent
+      DEPLOY_ENV: local
+    depends_on:
+      - datadog-agent
+
+  datadog-agent:
+    image: gcr.io/datadoghq/agent:7
+    environment:
+      DD_API_KEY: ${DD_API_KEY}
+      DD_SITE: ${DD_SITE:-datadoghq.com}
+      DD_APM_ENABLED: "true"
+      DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_HTTP_ENDPOINT: 0.0.0.0:4318
+      DD_LOGS_ENABLED: "false"
+    ports:
+      - "4318:4318"

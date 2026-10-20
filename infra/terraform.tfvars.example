@@ -1,0 +1,9 @@
+region         = "us-east-1"
+openai_api_key = "sk-..."
+agent_model    = "gpt-4o-mini"
+
+# To run on Bedrock instead of OpenAI:
+# llm_provider     = "bedrock"
+# bedrock_model_id = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
+
+# agent_runtime = "langgraph"

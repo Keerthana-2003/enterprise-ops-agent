@@ -1,0 +1,7 @@
+{
+  "app": "python3 app.py",
+  "context": {
+    "agent_model": "gpt-4o-mini",
+    "llm_provider": "openai"
+  }
+}
