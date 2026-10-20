@@ -9,14 +9,14 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements-dev.txt
       - name: Lint
-        run: ruff check .
+        run: ruff check --output-format=github .
       - name: Unit tests (offline, scripted LLM)
         run: pytest -q
 
@@ -26,7 +26,7 @@ jobs:
       run:
         working-directory: infra
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: hashicorp/setup-terraform@v3
       - run: terraform init -backend=false
       - run: terraform validate
@@ -37,11 +37,11 @@ jobs:
       run:
         working-directory: infra-cdk
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "20"
       - run: pip install -r requirements.txt
@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build image
         run: docker build -t enterprise-ops-agent .
       - name: Smoke test /health
