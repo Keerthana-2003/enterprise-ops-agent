@@ -10,6 +10,7 @@ Every tool:
 from __future__ import annotations
 
 import json
+import os
 import re
 import sqlite3
 import time
@@ -126,6 +127,11 @@ def build_tools(data_dir: Path) -> tuple[ToolRegistry, Ontology, list[dict]]:
     data_dir = Path(data_dir)
     ontology = Ontology(data_dir / "ontology.json")
     docs = DocSearch(data_dir / "docs")
+    vector_store = None
+    if os.getenv("DATABASE_URL"):  # PostgreSQL + pgvector retrieval instead of in-memory TF-IDF
+        from .memory import store_from_env
+
+        vector_store = store_from_env(os.environ["DATABASE_URL"], str(data_dir / "docs"))
     tickets = json.loads((data_dir / "tickets.json").read_text())
     proposed_actions: list[dict] = []
     known_domains = {e["identifiers"].get("support_domain") for e in ontology.entities.values()} - {None}
@@ -153,7 +159,7 @@ def build_tools(data_dir: Path) -> tuple[ToolRegistry, Ontology, list[dict]]:
         return [t for t in tickets if t["domain"] == support_domain and (status is None or t["status"] == status)]
 
     def search_policies(query: str) -> list[dict]:
-        hits = docs.search(query)
+        hits = vector_store.search(query) if vector_store is not None else docs.search(query)
         if not hits:
             raise ToolError("No policy passages matched. Rephrase with policy terms like escalation, credit, SLA.")
         return hits

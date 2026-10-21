@@ -64,6 +64,7 @@ _background: set[asyncio.Task] = set()
 
 
 class RunRequest(BaseModel):
+    conversation_id: str | None = Field(None, description="Continue a conversation (needs DATABASE_URL)")
     task: str = Field(..., min_length=3, max_length=2000,
                       examples=["Fabrikam has open tickets and overdue invoices. What should we do?"])
     max_steps: int = Field(10, ge=1, le=25)
@@ -121,11 +122,38 @@ def health() -> dict:
             "runtime": os.getenv("AGENT_RUNTIME", "loop"), "tracing": _tracer.enabled, "auth": _verifier is not None}
 
 
+def _memory():
+    if not os.getenv("DATABASE_URL"):
+        return None
+    from agent.memory import store_from_env
+
+    return store_from_env(os.environ["DATABASE_URL"], str(DATA_DIR / "docs"))
+
+
 @app.post("/runs")
 async def create_run(req: RunRequest, user: dict | None = Depends(require_user)) -> dict:
-    result = (await make_agent(req).arun(req.task)).to_dict()
+    memory = _memory() if req.conversation_id else None
+    task = req.task
+    if memory is not None:
+        from agent.memory import with_history
+
+        memory.start_conversation((user or {}).get("sub"), req.conversation_id)
+        task = with_history(req.task, memory.history(req.conversation_id))
+    result = (await make_agent(req).arun(task)).to_dict()
+    if memory is not None:
+        memory.add_message(req.conversation_id, "user", req.task)
+        memory.add_message(req.conversation_id, "assistant", result.get("answer") or "")
+        result["conversation_id"] = req.conversation_id
     _store(result)
     return result
+
+
+@app.get("/conversations/{conversation_id}")
+def get_conversation(conversation_id: str, user: dict | None = Depends(require_user)) -> dict:
+    memory = _memory()
+    if memory is None:
+        raise HTTPException(status_code=404, detail="Conversation memory is not configured (set DATABASE_URL)")
+    return {"conversation_id": conversation_id, "messages": memory.history(conversation_id, limit=100)}
 
 
 @app.post("/runs/stream")

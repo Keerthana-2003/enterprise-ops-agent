@@ -183,6 +183,20 @@ kubectl apply -f k8s/monitoring/                            # ServiceMonitor + a
 - **Tested in CI:** every push creates a kind cluster, deploys the stack, runs a full canary dial-up
   and promotion and a blue/green switch, and validates the alert rules with `promtool`.
 
+## PostgreSQL + pgvector (retrieval and conversation memory)
+
+Set `DATABASE_URL` to a PostgreSQL database with the `vector` extension and the agent switches
+policy search from in-memory TF-IDF to pgvector cosine search (HNSW index), and `POST /runs` with a
+`conversation_id` keeps multi-turn memory, so follow-ups like "what about their invoices?" resolve
+against earlier turns (`GET /conversations/{id}` returns the history). Schema and migrations live in
+`agent/memory.py`; embeddings come from OpenAI (`EMBEDDINGS=openai`) or an offline hashing embedder.
+CI runs these tests against a real `pgvector/pgvector` Postgres container.
+
+```bash
+docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=postgres pgvector/pgvector:pg16
+export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
+```
+
 ## Multi-cloud LLM providers
 
 `LLM_PROVIDER` selects the model platform without code changes: `openai` (or any OpenAI-compatible
