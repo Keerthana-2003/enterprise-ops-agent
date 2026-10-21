@@ -24,7 +24,7 @@ from collections import Counter
 from pathlib import Path
 
 from agent.core import Agent
-from agent.bedrock import make_llm
+from agent.providers import make_llm
 from agent.seed import DATA, seed
 from agent.telemetry import configure_otel
 

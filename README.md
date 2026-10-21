@@ -183,6 +183,20 @@ kubectl apply -f k8s/monitoring/                            # ServiceMonitor + a
 - **Tested in CI:** every push creates a kind cluster, deploys the stack, runs a full canary dial-up
   and promotion and a blue/green switch, and validates the alert rules with `promtool`.
 
+## Multi-cloud LLM providers
+
+`LLM_PROVIDER` selects the model platform without code changes: `openai` (or any OpenAI-compatible
+server such as vLLM or Ollama), `azure` (Azure OpenAI), `vertex` (Gemini on Google Cloud Vertex AI
+through its OpenAI-compatible endpoint, with automatic token refresh) or `bedrock` (AWS Bedrock
+Converse API). See `agent/providers.py`.
+
+## Packaging as a client solution
+
+[`docs/SOLUTION_BRIEF.md`](docs/SOLUTION_BRIEF.md) turns this repository into a proposal: client
+goals, cloud-by-cloud architecture options, a phased implementation roadmap with exit criteria,
+team structure, pricing approach, risks and a sales enablement one-pager. `deploy/cost_estimate.py`
+models monthly run cost from volume and the token counts measured by the eval harness.
+
 ## Project layout
 
 ```

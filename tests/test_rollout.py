@@ -49,3 +49,13 @@ def test_evaluate_canary_against_baseline():
 def test_dial_up_plan_starts_one_box_and_reaches_full():
     assert dial_up_plan(4) == [(1, 4), (1, 3), (2, 2), (4, 0)]
     assert dial_up_plan(1) == [(1, 1), (1, 0)]
+
+
+def test_cost_model_arithmetic_and_cache_savings():
+    from cost_estimate import Assumptions, estimate
+
+    a = Assumptions(runs_per_day=1000, prompt_tokens=1_000_000, completion_tokens=0, cache_hit_rate=0.5,
+                    price_in=1.0, price_cached=0.5, price_out=0.0, pods=0, observability_monthly=0, days_per_month=1)
+    r = estimate(a)
+    assert r["llm_cost_per_run_usd"] == 0.75  # 0.5M uncached at $1 + 0.5M cached at $0.5
+    assert r["monthly_usd"]["total"] == 750.0 and r["prompt_caching_saves_usd_per_month"] == 250.0

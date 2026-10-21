@@ -109,9 +109,7 @@ class BedrockConverseClient:
 
 
 def make_llm(model: str | None = None):
-    """Pick the LLM provider from LLM_PROVIDER (openai | bedrock)."""
-    if os.getenv("LLM_PROVIDER", "openai").lower() == "bedrock":
-        return BedrockConverseClient(model=model)
-    from .llm import AsyncOpenAIChatClient
+    """Kept for backwards compatibility; see agent.providers.make_llm."""
+    from .providers import make_llm as _make_llm
 
-    return AsyncOpenAIChatClient(model=model)
+    return _make_llm(model)

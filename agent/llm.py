@@ -51,7 +51,12 @@ class AsyncOpenAIChatClient:
         api_key: str | None = None,
         max_retries: int = 3,
         timeout_s: float = 30.0,
+        client: Any = None,
     ):
+        self.max_retries = max_retries
+        if client is not None:  # pre-built client (Azure OpenAI, Vertex AI, tests)
+            self.client, self.model = client, model or os.getenv("AGENT_MODEL", "gpt-4o-mini")
+            return
         from openai import AsyncOpenAI  # imported lazily so tests run without the SDK
 
         base = base_url or os.getenv("OPENAI_BASE_URL")
@@ -65,7 +70,6 @@ class AsyncOpenAIChatClient:
             timeout=timeout_s,
             max_retries=0,  # retries are handled here so they are visible in traces
         )
-        self.max_retries = max_retries
 
     async def chat(self, messages: list[dict], tools: list[dict], json_mode: bool = False) -> LLMResponse:
         kwargs: dict[str, Any] = {"model": self.model, "messages": messages, "temperature": 0}

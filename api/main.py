@@ -31,7 +31,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field, HttpUrl
 
-from agent.bedrock import make_llm
+from agent.providers import make_llm
 from agent.core import Agent
 from agent.seed import DATA, seed
 from agent.telemetry import configure_otel

@@ -12,3 +12,5 @@ opentelemetry-api>=1.25
 opentelemetry-sdk>=1.25
 opentelemetry-exporter-otlp-proto-http>=1.25
 prometheus-client>=0.20
+google-auth>=2.29
+requests>=2.31
