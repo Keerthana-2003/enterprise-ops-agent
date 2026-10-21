@@ -70,7 +70,11 @@ async def evaluate(args: argparse.Namespace) -> dict:
         seed()
     configure_otel("enterprise-ops-agent-evals")
     model = os.getenv("BEDROCK_MODEL_ID") if os.getenv("LLM_PROVIDER") == "bedrock" else os.getenv("AGENT_MODEL", "gpt-4o-mini")
-    if args.runtime == "langgraph":
+    if getattr(args, "router", False):
+        from agent.routing import router_from_env
+
+        agent = router_from_env(DATA, max_steps=args.max_steps)
+    elif args.runtime == "langgraph":
         from agent.graph import LangGraphAgent
 
         agent = LangGraphAgent(make_llm(model), DATA, max_steps=args.max_steps)
@@ -88,6 +92,7 @@ async def evaluate(args: argparse.Namespace) -> dict:
         tool_calls = sum(1 for s in run["steps"] if s["kind"] in ("tool", "guard") and s["name"] != "final_answer")
         row = {"id": task["id"], "passed": passed, "failure": failure, "status": run["status"],
                "structured": run["structured"], "tool_calls": tool_calls, "tool_errors": run["tool_errors"],
+               "routing": run.get("routing"),
                "max_parallel_tool_calls": run["max_parallel_tool_calls"], "latency_ms": run["latency_ms"],
                "tokens": run["total_tokens"], "cached_tokens": run["cached_tokens"],
                "prompt_tokens": run["prompt_tokens"], "judge": score.model_dump() if score else None,
@@ -129,6 +134,10 @@ async def evaluate(args: argparse.Namespace) -> dict:
         "p95_latency_s": round(latencies[max(0, int(len(latencies) * 0.95) - 1)] / 1000, 2),
         "avg_tokens": round(statistics.mean(r["tokens"] for r in rows)),
         "prompt_cache_hit_rate": round(sum(r["cached_tokens"] for r in rows) / total_prompt, 3),
+        "routing": None if not rows or not rows[0].get("routing") else {
+            "answered_by_small_tier": round(sum(r["routing"]["answered_by"] == "small" for r in rows) / len(rows), 3),
+            "escalation_rate": round(sum(r["routing"]["escalated"] for r in rows) / len(rows), 3),
+            "sent_straight_to_large": round(sum(r["routing"]["initial_tier"] == "large" for r in rows) / len(rows), 3)},
     }
     return {"summary": summary, "runs": rows}
 
@@ -141,6 +150,7 @@ def main() -> None:
     parser.add_argument("--judge-model", default=os.getenv("JUDGE_MODEL", "gpt-4o-mini"))
     parser.add_argument("--no-judge", action="store_true")
     parser.add_argument("--runtime", choices=["loop", "langgraph"], default="loop")
+    parser.add_argument("--router", action="store_true", help="route between ROUTER_SMALL_MODEL and the main model")
     args = parser.parse_args()
 
     report = asyncio.run(evaluate(args))

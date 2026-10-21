@@ -1,0 +1,17 @@
+{
+  "teams": {
+    "<sha256 of the ops team's API key: python -c \"from gateway.core import hash_key; print(hash_key('...'))\">": {
+      "name": "ops", "models": ["fast", "smart"], "rpm": 120, "daily_tokens": 2000000
+    }
+  },
+  "routes": {
+    "fast":  {"upstream": "local-slm", "fallback": "smart", "price_in": 0.0, "price_out": 0.0},
+    "smart": {"upstream": "bedrock-claude", "fallback": "smart-azure", "price_in": 0.0, "price_out": 0.0},
+    "smart-azure": {"upstream": "azure-gpt4o", "price_in": 0.0, "price_out": 0.0}
+  },
+  "upstreams": {
+    "local-slm": {"provider": "openai-compatible", "model": "llama3.2:3b", "base_url": "http://ollama:11434/v1"},
+    "bedrock-claude": {"provider": "bedrock", "model": "us.anthropic.claude-3-5-haiku-20241022-v1:0"},
+    "azure-gpt4o": {"provider": "azure", "model": "gpt-4o"}
+  }
+}

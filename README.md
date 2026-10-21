@@ -218,6 +218,23 @@ Converse API). See `agent/providers.py`.
 them on quality (task success and judge score), p95 latency and cost per run, recommending the best
 model that clears a minimum success rate. Prices are inputs: use current Bedrock pricing for your region.
 
+## Model routing, model gateway and architecture decisions
+
+- **Model routing with an SLM tier** (`agent/routing.py`): requests are scored for complexity and
+  risk without an extra model call. Simple lookups go to a small language model (default Llama 3.2
+  3B on Ollama or vLLM); multi-system, decision or money-related requests go to the large model. A
+  small-model answer that fails validation (no valid structured answer, low confidence, tool errors
+  or any proposed action) is escalated. `python -m evals.run_evals --router` reports the share of
+  requests answered by each tier and the escalation rate.
+- **Model gateway** (`gateway/`): an OpenAI-compatible service in front of all providers with
+  per-team API keys (stored hashed), model allow-lists, rate limits, daily token budgets, model
+  aliases, provider fallback, and usage and cost per team (`GET /admin/usage`). Any OpenAI SDK can
+  use it by pointing `base_url` at the gateway. Run with `GATEWAY_CONFIG=gateway/config.json uvicorn
+  gateway.app:app_from_env --factory`.
+- **When to use AI** ([`docs/AI_DECISION_FRAMEWORK.md`](docs/AI_DECISION_FRAMEWORK.md)): a decision
+  ladder from rules and automation through traditional ML, SLMs, RAG, agents and fine-tuning, with
+  scoring factors and non-functional gates. Architecture decision records are in [`docs/adr/`](docs/adr/).
+
 ## Packaging as a client solution
 
 [`docs/SOLUTION_BRIEF.md`](docs/SOLUTION_BRIEF.md) turns this repository into a proposal: client
