@@ -235,6 +235,21 @@ model that clears a minimum success rate. Prices are inputs: use current Bedrock
   ladder from rules and automation through traditional ML, SLMs, RAG, agents and fine-tuning, with
   scoring factors and non-functional gates. Architecture decision records are in [`docs/adr/`](docs/adr/).
 
+## Multi-agent system, MCP and A2A
+
+- **Supervisor + specialists** (`agent/multi_agent.py`): a supervisor agent breaks the request into sub-questions and delegates them to a billing, a support and an account agent. Each specialist is a full agent restricted to its own tools (least privilege). Independent delegations run in parallel; findings are shared through a blackboard so later specialists build on earlier ones; every hand-off is recorded with latency and status. Only the supervisor can propose actions, and a human approves them.
+- **Agent-to-agent (A2A)** (`agent/a2a.py`): any specialist can be published as a remote agent with an Agent Card (`/.well-known/agent-card.json`) and a JSON-RPC `message/send` endpoint; `RemoteSpecialist` calls it and the supervisor treats local and remote agents the same way.
+- **Model Context Protocol (MCP)** (`agent/mcp_tools.py`): `python -m agent.mcp_tools` serves the enterprise tools (with their schemas and read-only guards) and the ontology resource over MCP; `MCPToolset` lets the agent use tools from any MCP server.
+- **Strands Agents** (`agent/strands_agent.py`): the same team built with AWS Strands (Bedrock model, specialists as tools).
+- **Amazon Bedrock AgentCore Runtime** (`agent/agentcore_app.py`, `Dockerfile.agentcore`): `/invocations` entrypoint running the single agent or the multi-agent team.
+
+All of it is tested in the `agentic` CI job (`requirements-agentic.txt`) with scripted models, an in-memory MCP session and an in-process A2A server.
+
+## Serverless, event-driven and multi-account AWS
+
+- **`infra-serverless/`** (Terraform): API Gateway HTTP API with a Cognito JWT authorizer and throttling → Lambda (container image in ECR, FastAPI through Mangum); EventBridge rule (P1 ticket escalated, invoice overdue, agent task requested) → SQS with DLQ → Lambda consumer with partial batch failures and idempotent runs (`serverless/handlers.py`) → results in S3 and a completion event back on the bus. One customer-managed KMS key (rotation on) encrypts the Secrets Manager secret, logs, queues, bucket, ECR and Lambda environment. One IAM role per function, scoped to its own resources.
+- **`infra-multi-account/`** (Terraform): shared-services, dev, prod and security accounts. Terraform assumes a role in each account (provider aliases with ExternalId); shared ECR and KMS key policies grant the workload accounts pull/decrypt only; each workload account gets a permission boundary, a CI deploy role trusted only from the CI role in shared services (ExternalId, release tag in prod), the agent runtime role (Lambda/AgentCore, approved Bedrock models only) and an MFA-protected read-only audit role for the security account; an SCP on the workloads OU enforces a region allow-list, protects CloudTrail and allows only approved Bedrock models.
+
 ## Packaging as a client solution
 
 [`docs/SOLUTION_BRIEF.md`](docs/SOLUTION_BRIEF.md) turns this repository into a proposal: client

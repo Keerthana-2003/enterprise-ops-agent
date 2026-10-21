@@ -1,0 +1,12 @@
+# Bedrock AgentCore Runtime image (arm64, port 8080: POST /invocations, GET /ping).
+#   docker buildx build --platform linux/arm64 -f Dockerfile.agentcore -t <acct>.dkr.ecr.<region>.amazonaws.com/ops-agent-agentcore:v1 --push .
+FROM --platform=linux/arm64 python:3.12-slim
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 LLM_PROVIDER=bedrock
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt bedrock-agentcore
+COPY agent ./agent
+RUN python -m agent.seed && useradd --create-home appuser && chown -R appuser /app
+USER appuser
+EXPOSE 8080
+CMD ["python", "-m", "agent.agentcore_app"]

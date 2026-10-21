@@ -113,13 +113,17 @@ Emit = Callable[[StreamEvent], Awaitable[None]]
 
 class Agent:
     def __init__(self, llm: LLMClient, data_dir: Path, max_steps: int = 10, max_tool_errors: int = 4,
-                 max_total_tokens: int = 60_000, tracer: Tracer | None = None):
+                 max_total_tokens: int = 60_000, tracer: Tracer | None = None,
+                 allowed_tools: set[str] | None = None, tools_factory=None, system_prompt: str | None = None):
         self.llm = llm
         self.data_dir = Path(data_dir)
         self.max_steps = max_steps
         self.max_tool_errors = max_tool_errors
         self.max_total_tokens = max_total_tokens
         self.tracer = tracer or Tracer()
+        self.allowed_tools = allowed_tools          # restrict a specialist agent to a subset of tools
+        self.tools_factory = tools_factory          # e.g. MCP-backed tools or supervisor delegation tools
+        self.system_prompt = system_prompt
 
     # ---------------------------------------------------------------- public API
 
@@ -156,11 +160,13 @@ class Agent:
     # ---------------------------------------------------------------- loop
 
     async def _run(self, task: str, emit: Emit) -> RunResult:
-        registry, ontology, proposed = build_tools(self.data_dir)  # fresh state per run
+        registry, ontology, proposed = (self.tools_factory or build_tools)(self.data_dir)  # fresh state per run
+        if self.allowed_tools is not None:
+            registry.tools = {k: v for k, v in registry.tools.items() if k in self.allowed_tools}
         tools = registry.schemas() + [_final_answer_schema()]
         result = RunResult(run_id=uuid.uuid4().hex[:12], task=task, status="running", answer=None)
         messages: list[dict] = [
-            {"role": "system", "content": SYSTEM_PROMPT.format(ontology=ontology.schema_summary())},
+            {"role": "system", "content": (self.system_prompt or SYSTEM_PROMPT).format(ontology=ontology.schema_summary())},
             {"role": "user", "content": task},
         ]
         seen_calls: dict[str, int] = {}

@@ -1,0 +1,10 @@
+# Lambda container image (arm64). Build from the repo root:
+#   docker build --platform linux/arm64 -f infra-serverless/Dockerfile.lambda -t ops-agent-lambda .
+FROM public.ecr.aws/lambda/python:3.12
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt mangum
+COPY agent ./agent
+COPY api ./api
+COPY serverless ./serverless
+RUN python -m agent.seed
+CMD ["serverless.handlers.api_handler"]

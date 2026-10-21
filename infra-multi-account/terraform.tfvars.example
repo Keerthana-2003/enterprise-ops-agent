@@ -1,0 +1,8 @@
+accounts = {
+  shared   = "111111111111"
+  dev      = "222222222222"
+  prod     = "333333333333"
+  security = "444444444444"
+}
+workloads_ou_id = "ou-abcd-12345678"
+external_id     = "replace-with-a-long-random-string"

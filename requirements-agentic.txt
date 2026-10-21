@@ -1,0 +1,5 @@
+-r requirements-dev.txt
+mcp>=1.9
+strands-agents>=1.0
+bedrock-agentcore>=0.1
+mangum>=0.17

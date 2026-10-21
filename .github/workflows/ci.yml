@@ -20,11 +20,28 @@ jobs:
       - name: Unit tests (offline, scripted LLM)
         run: pytest -q
 
+  agentic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements-agentic.txt
+      - name: Multi-agent, A2A, MCP, Strands, AgentCore, serverless handlers (no skips allowed)
+        run: |
+          pytest -q -rs tests/test_multi_agent.py tests/test_agentic_protocols.py tests/test_serverless.py | tee out.log
+          ! grep -q "SKIPPED" out.log
+
   terraform:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dir: [infra, infra-serverless, infra-multi-account]
     defaults:
       run:
-        working-directory: infra
+        working-directory: ${{ matrix.dir }}
     steps:
       - uses: actions/checkout@v5
       - uses: hashicorp/setup-terraform@v3
