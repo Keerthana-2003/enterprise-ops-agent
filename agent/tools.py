@@ -128,7 +128,11 @@ def build_tools(data_dir: Path) -> tuple[ToolRegistry, Ontology, list[dict]]:
     ontology = Ontology(data_dir / "ontology.json")
     docs = DocSearch(data_dir / "docs")
     vector_store = None
-    if os.getenv("DATABASE_URL"):  # PostgreSQL + pgvector retrieval instead of in-memory TF-IDF
+    if os.getenv("RETRIEVAL") == "bedrock-kb":  # Knowledge Bases for Amazon Bedrock (managed RAG)
+        from .bedrock_services import KnowledgeBaseRetriever
+
+        vector_store = KnowledgeBaseRetriever()
+    elif os.getenv("DATABASE_URL"):  # PostgreSQL + pgvector retrieval instead of in-memory TF-IDF
         from .memory import store_from_env
 
         vector_store = store_from_env(os.environ["DATABASE_URL"], str(data_dir / "docs"))

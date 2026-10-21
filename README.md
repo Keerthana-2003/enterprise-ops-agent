@@ -204,6 +204,20 @@ server such as vLLM or Ollama), `azure` (Azure OpenAI), `vertex` (Gemini on Goog
 through its OpenAI-compatible endpoint, with automatic token refresh) or `bedrock` (AWS Bedrock
 Converse API). See `agent/providers.py`.
 
+## AWS Bedrock services
+
+| Service | How it's used | Switch |
+|---|---|---|
+| Converse API | Agent loop with tool use, prompt-cache points, retries | `LLM_PROVIDER=bedrock`, `BEDROCK_MODEL_ID` |
+| Guardrails for Amazon Bedrock | Attached to every Converse call; `ApplyGuardrail` also screens user input and final answers (content filters, prompt-attack detection, PII masking/blocking, denied topics). Defined in `infra/bedrock_guardrail.tf` | `BEDROCK_GUARDRAIL_ID`, `BEDROCK_GUARDRAIL_VERSION` |
+| Knowledge Bases for Amazon Bedrock | Managed RAG backend for policy search | `RETRIEVAL=bedrock-kb`, `BEDROCK_KB_ID` |
+| Titan Text Embeddings v2 / Cohere Embed | Embeddings for the pgvector store | `EMBEDDINGS=bedrock-titan` or `bedrock-cohere` |
+
+**Foundation-model selection.** `python -m evals.compare_models --models <ids...> --judge-model <id>
+--prices prices.json` runs the evaluation set on each Bedrock model with one fixed judge and ranks
+them on quality (task success and judge score), p95 latency and cost per run, recommending the best
+model that clears a minimum success rate. Prices are inputs: use current Bedrock pricing for your region.
+
 ## Packaging as a client solution
 
 [`docs/SOLUTION_BRIEF.md`](docs/SOLUTION_BRIEF.md) turns this repository into a proposal: client

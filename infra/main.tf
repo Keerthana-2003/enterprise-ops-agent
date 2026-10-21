@@ -91,7 +91,7 @@ resource "aws_iam_role_policy" "bedrock" {
     Version = "2012-10-17"
     Statement = [{
       Effect   = "Allow"
-      Action   = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
+      Action   = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream", "bedrock:ApplyGuardrail", "bedrock:Retrieve"]
       Resource = "*"
     }]
   })
@@ -136,6 +136,8 @@ resource "aws_apprunner_service" "agent" {
           COGNITO_USER_POOL_ID = aws_cognito_user_pool.users.id
           COGNITO_CLIENT_ID    = aws_cognito_user_pool_client.api.id
           COGNITO_REGION       = var.region
+          BEDROCK_GUARDRAIL_ID      = aws_bedrock_guardrail.agent.guardrail_id
+          BEDROCK_GUARDRAIL_VERSION = aws_bedrock_guardrail_version.agent.version
         }
         runtime_environment_secrets = {
           OPENAI_API_KEY = aws_secretsmanager_secret.openai.arn

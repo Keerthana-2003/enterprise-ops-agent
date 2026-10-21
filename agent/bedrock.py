@@ -68,6 +68,9 @@ def from_converse(response: dict) -> LLMResponse:
                       arguments=json.dumps(b["toolUse"].get("input", {})))
              for b in blocks if "toolUse" in b]
     usage = response.get("usage", {})
+    if response.get("stopReason") == "guardrail_intervened":  # Bedrock Guardrails blocked the input or output
+        return LLMResponse(content=text or "This request was blocked by the content guardrail.", tool_calls=[],
+                           prompt_tokens=usage.get("inputTokens", 0), completion_tokens=usage.get("outputTokens", 0))
     return LLMResponse(content=text, tool_calls=calls,
                        prompt_tokens=usage.get("inputTokens", 0) + usage.get("cacheReadInputTokens", 0),
                        completion_tokens=usage.get("outputTokens", 0),
@@ -76,11 +79,16 @@ def from_converse(response: dict) -> LLMResponse:
 
 class BedrockConverseClient:
     def __init__(self, model: str | None = None, region: str | None = None, max_retries: int = 3,
-                 prompt_cache: bool | None = None, client: Any = None):
+                 prompt_cache: bool | None = None, client: Any = None, guardrail_id: str | None = None,
+                 guardrail_version: str | None = None):
         self.model = model or os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-3-5-haiku-20241022-v1:0")
         self.max_retries = max_retries
         self.prompt_cache = prompt_cache if prompt_cache is not None else os.getenv("BEDROCK_PROMPT_CACHE") == "1"
         self._last_tools: list[dict] = []
+        gid = guardrail_id or os.getenv("BEDROCK_GUARDRAIL_ID")
+        self.guardrail = ({"guardrailIdentifier": gid, "guardrailVersion": guardrail_version or
+                           os.getenv("BEDROCK_GUARDRAIL_VERSION", "DRAFT"), "trace": "enabled"} if gid else None)
+        self.guardrail_interventions = 0
         if client is None:
             import boto3  # imported lazily so tests run without the AWS SDK
 
@@ -96,10 +104,14 @@ class BedrockConverseClient:
             messages = messages + [{"role": "user", "content": "Respond with a single JSON object only."}]
         request = to_converse(messages, tools or self._last_tools, self.prompt_cache)
         request["inferenceConfig"] = {"temperature": 0}
+        if self.guardrail:
+            request["guardrailConfig"] = self.guardrail
         last_err: Exception | None = None
         for attempt in range(self.max_retries + 1):
             try:
                 resp = await asyncio.to_thread(self.client.converse, modelId=self.model, **request)
+                if resp.get("stopReason") == "guardrail_intervened":
+                    self.guardrail_interventions += 1
                 return from_converse(resp)
             except Exception as err:  # throttling, timeouts, 5xx
                 last_err = err

@@ -132,6 +132,13 @@ def _memory():
 
 @app.post("/runs")
 async def create_run(req: RunRequest, user: dict | None = Depends(require_user)) -> dict:
+    from agent.bedrock_services import guardrail_from_env
+
+    guard = guardrail_from_env()
+    if guard is not None:  # Guardrails for Amazon Bedrock on the user's input
+        verdict = await asyncio.to_thread(guard.check, req.task, "INPUT")
+        if verdict.blocked:
+            return {"status": "blocked_by_guardrail", "answer": verdict.text, "reasons": verdict.reasons}
     memory = _memory() if req.conversation_id else None
     task = req.task
     if memory is not None:
@@ -140,6 +147,10 @@ async def create_run(req: RunRequest, user: dict | None = Depends(require_user))
         memory.start_conversation((user or {}).get("sub"), req.conversation_id)
         task = with_history(req.task, memory.history(req.conversation_id))
     result = (await make_agent(req).arun(task)).to_dict()
+    if guard is not None and result.get("answer"):  # and on the final answer (e.g. masks PII)
+        out = await asyncio.to_thread(guard.check, result["answer"], "OUTPUT")
+        result["answer"] = out.text
+        result["guardrail"] = {"blocked": out.blocked, "reasons": out.reasons}
     if memory is not None:
         memory.add_message(req.conversation_id, "user", req.task)
         memory.add_message(req.conversation_id, "assistant", result.get("answer") or "")

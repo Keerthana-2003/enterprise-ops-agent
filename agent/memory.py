@@ -108,7 +108,8 @@ class PgVectorStore:
         return inserted
 
     def search(self, query: str, k: int = 3) -> list[dict]:
-        v = _vec(self.embedder.embed([query])[0])
+        q = self.embedder.embed_query(query) if hasattr(self.embedder, "embed_query") else self.embedder.embed([query])[0]
+        v = _vec(q)
         with self.conn.cursor() as cur:
             cur.execute(f"""SELECT source, chunk, 1 - (embedding <=> %s::vector) AS score
                 FROM {self.p}_policy_chunks ORDER BY embedding <=> %s::vector LIMIT %s""", (v, v, k))
@@ -141,7 +142,14 @@ class PgVectorStore:
 
 
 def embedder_from_env():
-    return OpenAIEmbedder() if os.getenv("EMBEDDINGS", "hashing") == "openai" else HashingEmbedder()
+    kind = os.getenv("EMBEDDINGS", "hashing")
+    if kind == "openai":
+        return OpenAIEmbedder()
+    if kind.startswith("bedrock"):
+        from .bedrock_services import BedrockEmbedder
+
+        return BedrockEmbedder("cohere.embed-english-v3" if kind == "bedrock-cohere" else "amazon.titan-embed-text-v2:0")
+    return HashingEmbedder()
 
 
 @lru_cache(maxsize=4)
