@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-config
+  namespace: ops-agent
+data:
+  AGENT_MODEL: gpt-4o-mini
+  LLM_PROVIDER: openai
+  AGENT_RUNTIME: loop

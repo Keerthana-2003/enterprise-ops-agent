@@ -1,0 +1,48 @@
+# Alarms. Each alert links to its section of INCIDENT_RESPONSE.md.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: agent-alerts
+  namespace: ops-agent
+  labels: {release: kube-prometheus-stack}
+spec:
+  groups:
+    - name: agent.slo
+      rules:
+        - alert: AgentHighErrorRate
+          expr: |
+            sum(rate(http_requests_total{namespace="ops-agent",route!~"/health|/metrics",status=~"5.."}[5m]))
+              / clamp_min(sum(rate(http_requests_total{namespace="ops-agent",route!~"/health|/metrics"}[5m])), 1e-9) > 0.02
+          for: 5m
+          labels: {severity: page}
+          annotations:
+            summary: "Agent API 5xx rate above 2% for 5 minutes"
+            runbook: "INCIDENT_RESPONSE.md#agenthigherrorrate"
+        - alert: AgentHighLatencyP95
+          expr: |
+            histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{namespace="ops-agent",route="/runs"}[5m]))) > 20
+          for: 10m
+          labels: {severity: ticket}
+          annotations:
+            summary: "p95 /runs latency above 20 s"
+            runbook: "INCIDENT_RESPONSE.md#agenthighlatencyp95"
+        - alert: AgentLLMErrors
+          expr: sum(rate(agent_runs_total{namespace="ops-agent",status="llm_error"}[10m])) / clamp_min(sum(rate(agent_runs_total{namespace="ops-agent"}[10m])), 1e-9) > 0.1
+          for: 10m
+          labels: {severity: page}
+          annotations:
+            summary: "More than 10% of agent runs fail to reach the LLM provider"
+            runbook: "INCIDENT_RESPONSE.md#agentllmerrors"
+        - alert: AgentPodsUnavailable
+          expr: kube_deployment_status_replicas_available{namespace="ops-agent",deployment="agent-stable"} < 1
+          for: 2m
+          labels: {severity: page}
+          annotations:
+            summary: "No available agent-stable pods"
+            runbook: "INCIDENT_RESPONSE.md#agentpodsunavailable"
+        - alert: AgentCrashLooping
+          expr: increase(kube_pod_container_status_restarts_total{namespace="ops-agent",container="api"}[15m]) > 3
+          labels: {severity: ticket}
+          annotations:
+            summary: "Agent container restarting repeatedly"
+            runbook: "INCIDENT_RESPONSE.md#agentcrashlooping"

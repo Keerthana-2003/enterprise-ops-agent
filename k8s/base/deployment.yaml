@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-stable
+  namespace: ops-agent
+  labels: {app: agent, track: stable}
+spec:
+  replicas: 4
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxSurge: 1, maxUnavailable: 0}
+  selector:
+    matchLabels: {app: agent, track: stable}
+  template:
+    metadata:
+      labels: {app: agent, track: stable}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+    spec:
+      terminationGracePeriodSeconds: 30
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, fsGroup: 1000}
+      containers:
+        - name: api
+          image: ops-agent
+          imagePullPolicy: IfNotPresent
+          ports: [{name: http, containerPort: 8000}]
+          env:
+            - {name: DEPLOY_TRACK, value: stable}
+            - {name: APP_VERSION, value: v1}
+            - name: OPENAI_API_KEY
+              valueFrom: {secretKeyRef: {name: agent-secrets, key: openai-api-key, optional: true}}
+          envFrom:
+            - configMapRef: {name: agent-config}
+          resources:
+            requests: {cpu: 250m, memory: 256Mi}
+            limits: {cpu: "1", memory: 768Mi}
+          readinessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: {path: /health, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            failureThreshold: 4
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}

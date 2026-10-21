@@ -1,0 +1,9 @@
+# Blue/green: the Service points at exactly one colour; deploy/rollout.py switches it.
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent-bg
+  namespace: ops-agent
+spec:
+  selector: {app: agent-bg, color: blue}
+  ports: [{name: http, port: 80, targetPort: http}]

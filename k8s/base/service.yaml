@@ -1,0 +1,10 @@
+# Selects stable AND canary pods: traffic splits in proportion to ready pods (used for dial-up).
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent
+  namespace: ops-agent
+  labels: {app: agent}
+spec:
+  selector: {app: agent}
+  ports: [{name: http, port: 80, targetPort: http}]

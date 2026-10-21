@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-${COLOR}
+  namespace: ops-agent
+  labels: {app: agent-bg, color: "${COLOR}"}
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: agent-bg, color: "${COLOR}"}
+  template:
+    metadata:
+      labels: {app: agent-bg, color: "${COLOR}"}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 1000}
+      containers:
+        - name: api
+          image: ${IMAGE}
+          imagePullPolicy: IfNotPresent
+          ports: [{name: http, containerPort: 8000}]
+          env:
+            - {name: DEPLOY_TRACK, value: "${COLOR}"}
+          envFrom:
+            - configMapRef: {name: agent-config}
+          resources:
+            requests: {cpu: 250m, memory: 256Mi}
+            limits: {cpu: "1", memory: 768Mi}
+          readinessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 5

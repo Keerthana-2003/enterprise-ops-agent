@@ -159,6 +159,30 @@ npx aws-cdk@2 bootstrap && npx aws-cdk@2 deploy
 `terraform destroy` removes everything. Note the OpenAI key is stored in Terraform state; use a
 remote encrypted backend for anything beyond a demo.
 
+## Kubernetes and progressive delivery
+
+```bash
+kubectl apply -k k8s/base                                  # Deployment (4 replicas), Service, HPA, PDB
+kubectl -n ops-agent create secret generic agent-secrets --from-literal=openai-api-key=$OPENAI_API_KEY
+python deploy/rollout.py canary --image <registry>/ops-agent:v2      # one-box -> 25% -> 50% -> 100%
+python deploy/rollout.py bluegreen --image <registry>/ops-agent:v2   # deploy idle colour, smoke test, switch
+kubectl apply -f k8s/monitoring/                            # ServiceMonitor + alert rules (Prometheus Operator)
+```
+
+- **Canary with gradual dial-up:** a single canary pod (one-box) joins the stable pods behind the
+  same Service, then its share grows step by step. After each bake period the canary's error rate
+  and p95 latency (read from each pod's `/metrics`) are compared with the stable baseline, and the
+  rollout promotes or rolls back automatically (`deploy/rollout.py`, unit-tested decision logic).
+- **Blue/green:** the idle colour is deployed and smoke-tested before the Service selector switches;
+  the old colour stays up for an instant rollback.
+- **Resilience:** readiness and liveness probes, resource requests and limits, HPA autoscaling,
+  PodDisruptionBudget, zero-downtime rolling updates, non-root containers.
+- **Alarms and incident response:** Prometheus metrics (`/metrics`), alert rules for error rate,
+  p95 latency, LLM provider errors, unavailable pods and crash loops, each linked to a section of
+  [`INCIDENT_RESPONSE.md`](INCIDENT_RESPONSE.md).
+- **Tested in CI:** every push creates a kind cluster, deploys the stack, runs a full canary dial-up
+  and promotion and a blue/green switch, and validates the alert rules with `promtool`.
+
 ## Project layout
 
 ```
@@ -178,6 +202,8 @@ api/auth.py     Cognito JWT verification
 evals/          versioned task set, deterministic grader, LLM-as-a-judge, harness
 infra/          Terraform: ECR, App Runner, CloudFront, Cognito, Secrets Manager, IAM
 infra-cdk/      the same stack in AWS CDK (Python)
+k8s/            Kubernetes manifests: base, canary, blue/green, monitoring and alerts
+deploy/         rollout.py: canary dial-up and blue/green with automatic rollback
 deploy/         Docker Compose with the Datadog Agent for OpenTelemetry traces
 tests/          offline tests for the loop, tools, evals and API
 ```

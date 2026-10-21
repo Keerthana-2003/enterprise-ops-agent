@@ -1,0 +1,40 @@
+# Applied by deploy/rollout.py with ${IMAGE} filled in. Same app label as stable, so the
+# shared Service sends it a share of traffic; track=canary lets us read its metrics separately.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-canary
+  namespace: ops-agent
+  labels: {app: agent, track: canary}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: agent, track: canary}
+  template:
+    metadata:
+      labels: {app: agent, track: canary}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, fsGroup: 1000}
+      containers:
+        - name: api
+          image: ${IMAGE}
+          imagePullPolicy: IfNotPresent
+          ports: [{name: http, containerPort: 8000}]
+          env:
+            - {name: DEPLOY_TRACK, value: canary}
+            - {name: APP_VERSION, value: "${IMAGE}"}
+            - name: OPENAI_API_KEY
+              valueFrom: {secretKeyRef: {name: agent-secrets, key: openai-api-key, optional: true}}
+          envFrom:
+            - configMapRef: {name: agent-config}
+          resources:
+            requests: {cpu: 250m, memory: 256Mi}
+            limits: {cpu: "1", memory: 768Mi}
+          readinessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /health, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}

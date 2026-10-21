@@ -48,6 +48,49 @@ jobs:
       - name: Synthesize CloudFormation
         run: npx --yes aws-cdk@2 synth --quiet
 
+  kubernetes:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: helm/kind-action@v1
+        with:
+          cluster_name: ci
+      - name: Build images and load into kind
+        run: |
+          docker build -t ops-agent:v1 .
+          docker tag ops-agent:v1 ops-agent:v2
+          kind load docker-image ops-agent:v1 ops-agent:v2 --name ci
+      - name: Deploy base (Deployment, Service, HPA, PDB)
+        run: |
+          kubectl apply -k k8s/base
+          kubectl -n ops-agent rollout status deploy/agent-stable --timeout=240s
+          kubectl get --raw /api/v1/namespaces/ops-agent/services/agent:80/proxy/health
+      - name: Canary with one-box and gradual dial-up, then promote
+        run: |
+          for i in $(seq 1 30); do kubectl get --raw /api/v1/namespaces/ops-agent/services/agent:80/proxy/runs/none >/dev/null 2>&1 || true; done
+          python deploy/rollout.py canary --image ops-agent:v2 --bake 5 --timeout 240
+          kubectl -n ops-agent get deploy/agent-stable -o jsonpath='{.spec.template.spec.containers[0].image}' | grep -q ops-agent:v2
+          ! kubectl -n ops-agent get deploy/agent-canary 2>/dev/null
+      - name: Blue/green switch
+        run: |
+          kubectl apply -f k8s/bluegreen/service.yaml
+          python deploy/rollout.py bluegreen --image ops-agent:v2 --timeout 240
+          test "$(kubectl -n ops-agent get svc/agent-bg -o jsonpath='{.spec.selector.color}')" = green
+      - name: Validate alert rules with promtool
+        run: |
+          pip install pyyaml
+          python -c "import yaml,sys; d=yaml.safe_load(open('k8s/monitoring/prometheusrule.yaml')); yaml.safe_dump(d['spec'], open('/tmp/rules.yaml','w'))"
+          docker run --rm -v /tmp:/rules --entrypoint promtool prom/prometheus:v2.53.0 check rules /rules/rules.yaml
+      - name: Debug on failure
+        if: failure()
+        run: |
+          kubectl -n ops-agent get all
+          kubectl -n ops-agent describe pods | tail -80
+
   docker:
     runs-on: ubuntu-latest
     needs: test

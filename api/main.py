@@ -21,13 +21,14 @@ import hmac
 import json
 import logging
 import os
+import time
 import uuid
 from collections import OrderedDict
 from pathlib import Path
 
 import httpx
-from fastapi import Depends, FastAPI, Header, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field, HttpUrl
 
 from agent.bedrock import make_llm
@@ -35,6 +36,7 @@ from agent.core import Agent
 from agent.seed import DATA, seed
 from agent.telemetry import configure_otel
 from agent.tracing import Tracer
+from api import metrics
 from api.auth import AuthError, bearer_token, verifier_from_env
 
 log = logging.getLogger("api")
@@ -86,9 +88,31 @@ def make_agent(req: RunRequest, allow_graph: bool = True):
 
 
 def _store(result: dict) -> None:
+    metrics.record_run(result)
     _runs[result["run_id"]] = result
     while len(_runs) > MAX_STORED_RUNS:
         _runs.popitem(last=False)
+
+
+@app.middleware("http")
+async def observe_requests(request: Request, call_next):
+    start = time.perf_counter()
+    status = 500
+    try:
+        response = await call_next(request)
+        status = response.status_code
+        return response
+    finally:
+        route = getattr(request.scope.get("route"), "path", "unmatched")
+        if route != "/metrics":
+            metrics.HTTP_REQUESTS.labels(request.method, route, str(status)).inc()
+            metrics.HTTP_LATENCY.labels(route).observe(time.perf_counter() - start)
+
+
+@app.get("/metrics", include_in_schema=False)
+def prometheus_metrics() -> Response:
+    body, content_type = metrics.render()
+    return Response(body, media_type=content_type)
 
 
 @app.get("/health")
